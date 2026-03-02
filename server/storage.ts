@@ -1,38 +1,33 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { type Booking, type InsertBooking, type ContactInquiry, type InsertContact, bookings, contactInquiries } from "@shared/schema";
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createBooking(booking: InsertBooking): Promise<Booking>;
+  getBookings(): Promise<Booking[]>;
+  createContactInquiry(inquiry: InsertContact): Promise<ContactInquiry>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
-  constructor() {
-    this.users = new Map();
+const db = drizzle(pool);
+
+export class DatabaseStorage implements IStorage {
+  async createBooking(insertBooking: InsertBooking): Promise<Booking> {
+    const [booking] = await db.insert(bookings).values(insertBooking).returning();
+    return booking;
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  async getBookings(): Promise<Booking[]> {
+    return db.select().from(bookings);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  async createContactInquiry(insertInquiry: InsertContact): Promise<ContactInquiry> {
+    const [inquiry] = await db.insert(contactInquiries).values(insertInquiry).returning();
+    return inquiry;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
